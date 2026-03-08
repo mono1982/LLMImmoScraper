@@ -1,0 +1,86 @@
+[
+    {
+        "title": "Einfamilienhaus in ruhiger Lage mit Garten",
+        "propertyType": "house",
+        "address": {
+            "postalCode": "1220",
+            "countryCode": "AT",
+            "addressString": "1220 Wien, Donaustadt"
+        },
+        "monetaryDetails": {
+            "transactionType": "sale",
+            "purchasingPrice": 899000,
+            "purchasingPricePerM2": 5351.19,
+            "rent": null,
+            "rentPerM2": null,
+            "currencyCode": "EUR",
+            "isCommissionFree": false
+        },
+        "features": {
+            "livingArea": 168,
+            "plotArea": 520,
+            "yearBuilt": 2005,
+            "bedrooms": 4,
+            "bathrooms": 2,
+            "floor": 2,
+            "hasGarage": true,
+            "hasCarport": false,
+            "hasParkingSpace": true,
+            "hasTerrace": true,
+            "hasBalcony": false,
+            "hasGarden": true,
+            "hasLoggia": false,
+            "hasPool": false,
+            "hasStorageRoom": true,
+            "isBarrierFree": false,
+            "hasBuiltInKitchen": true,
+            "hasElevator": false,
+            "hasAirConditioning": false,
+            "hasBasementCompartment": true
+        },
+        "url": "https://www.willhaben.at/iad/immobilien/d/haus-kaufen/wien/wien-1220-donaustadt/example-123",
+        "snapshotDate": "2026-03-08T19:30:00.000Z"
+    },
+    {
+        "title": "Modernes Reihenhaus nahe U2",
+        "propertyType": "house",
+        "address": {
+            "postalCode": "1220",
+            "countryCode": "AT",
+            "addressString": "1220 Wien, Aspern"
+        },
+        "monetaryDetails": {
+            "transactionType": "sale",
+            "purchasingPrice": 649000,
+            "purchasingPricePerM2": 4635.71,
+            "rent": null,
+            "rentPerM2": null,
+            "currencyCode": "EUR",
+            "isCommissionFree": true
+        },
+        "features": {
+            "livingArea": 140,
+            "plotArea": 280,
+            "yearBuilt": 2020,
+            "bedrooms": 3,
+            "bathrooms": 2,
+            "floor": 2,
+            "hasGarage": false,
+            "hasCarport": true,
+            "hasParkingSpace": true,
+            "hasTerrace": true,
+            "hasBalcony": true,
+            "hasGarden": true,
+            "hasLoggia": false,
+            "hasPool": false,
+            "hasStorageRoom": true,
+            "isBarrierFree": false,
+            "hasBuiltInKitchen": true,
+            "hasElevator": false,
+            "hasAirConditioning": false,
+            "hasBasementCompartment": true
+        },
+        "url": "https://www.immobilienscout24.at/expose/example-456",
+        "snapshotDate": "2026-03-08T19:35:00.000Z"
+    }
+]

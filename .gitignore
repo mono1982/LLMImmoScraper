@@ -1,0 +1,30 @@
+# Dependencies
+node_modules/
+
+# Environment
+.env
+
+# Runtime output
+input.txt
+output.txt
+log.txt
+
+# Original reference files
+*_original.txt
+
+# Crawlee storage
+.storage/
+storage/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Debug
+npm-debug.log*

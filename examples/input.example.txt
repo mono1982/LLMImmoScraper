@@ -1,0 +1,14 @@
+# LLM Immo Scraper — Example Input
+#
+# Add one search results URL per line.
+# The scraper will crawl each URL, discover individual property listings,
+# and extract structured data from each listing page.
+#
+# Supported sites: willhaben.at, immobilienscout24.at (and potentially others —
+# the LLM-based approach is site-agnostic).
+
+# willhaben.at — Houses for sale in Vienna, up to €500k
+https://www.willhaben.at/iad/immobilien/haus-kaufen/haus-angebote?areaId=900&rows=30&PRICE_TO=500000
+
+# immobilienscout24.at — Houses for sale in 1220 Wien
+https://www.immobilienscout24.at/regional/1220/haus-kaufen?primaryPriceTo=500000

@@ -1,0 +1,35 @@
+{
+  "name": "llm-immo-scraper",
+  "version": "1.0.0",
+  "description": "AI-powered real estate scraper using Gemini LLM to extract structured property data from Austrian listing sites",
+  "main": "src/main.js",
+  "scripts": {
+    "start": "node src/main.js",
+    "validate": "node src/validate.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "real-estate",
+    "scraper",
+    "llm",
+    "gemini",
+    "crawlee",
+    "playwright",
+    "web-scraping",
+    "austria",
+    "immobilien"
+  ],
+  "author": "",
+  "license": "MIT",
+  "type": "commonjs",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "@google-cloud/vertexai": "^1.10.0",
+    "@google/generative-ai": "^0.24.1",
+    "crawlee": "^3.16.0",
+    "dotenv": "^17.3.1",
+    "playwright": "^1.58.2"
+  }
+}
