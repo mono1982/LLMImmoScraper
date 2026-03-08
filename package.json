@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "description": "AI-powered real estate scraper using Gemini LLM to extract structured property data from Austrian listing sites",
   "main": "src/main.js",
+  "bin": {
+    "llm-immo-scraper": "src/main.js"
+  },
   "scripts": {
     "start": "node src/main.js",
     "validate": "node src/validate.js",

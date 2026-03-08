@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 require('dotenv').config();
 const fs = require('fs');
 const path = require('path');
@@ -8,34 +9,135 @@ const { handleSearchPage } = require('./handlers/search');
 const { handleDetailPage } = require('./handlers/detail');
 const Logger = require('./logger');
 
-// ── Configuration ────────────────────────────────────────────────────
-const INPUT_FILE = path.join(__dirname, '..', 'input.txt');
-const OUTPUT_FILE = path.join(__dirname, '..', 'output.txt');
-const LOG_FILE = path.join(__dirname, '..', 'log.txt');
+// ── CLI Argument Parsing ─────────────────────────────────────────────
+function parseArgs(argv) {
+    const args = argv.slice(2);
+    const opts = {
+        urls: [],
+        outputFile: null,
+        logFile: null,
+        quiet: false,
+        help: false,
+    };
 
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-if (!GEMINI_API_KEY) {
-    console.error('ERROR: GEMINI_API_KEY environment variable is required.');
-    console.error('Get a free key at: https://aistudio.google.com/app/apikey');
-    process.exit(1);
+    let i = 0;
+    while (i < args.length) {
+        const arg = args[i];
+        if (arg === '-h' || arg === '--help') {
+            opts.help = true;
+        } else if (arg === '-q' || arg === '--quiet') {
+            opts.quiet = true;
+        } else if ((arg === '-o' || arg === '--output') && i + 1 < args.length) {
+            opts.outputFile = args[++i];
+        } else if ((arg === '-l' || arg === '--log') && i + 1 < args.length) {
+            opts.logFile = args[++i];
+        } else if (arg.startsWith('http')) {
+            opts.urls.push(arg);
+        } else if (!arg.startsWith('-')) {
+            // Try treating non-flag args as URLs
+            opts.urls.push(arg);
+        }
+        i++;
+    }
+
+    return opts;
 }
+
+function printHelp() {
+    const help = `
+Usage: llm-immo-scraper [options] [urls...]
+
+  AI-powered real estate scraper using Gemini LLM.
+
+Arguments:
+  urls                    Search result URLs to scrape (space-separated)
+
+Options:
+  -o, --output <file>     Write JSON output to file instead of stdout
+  -l, --log <file>        Write logs to file in addition to stderr
+  -q, --quiet             Suppress log output
+  -h, --help              Show this help message
+
+Modes:
+  CLI mode (urls given):  Logs → stderr, JSON → stdout (pipe-friendly)
+  File mode (no urls):    Reads input.txt, writes output.txt, logs to log.txt
+
+Examples:
+  # Scrape and pipe JSON output
+  llm-immo-scraper "https://willhaben.at/..." | jq '.[].title'
+
+  # Scrape multiple sites, save to file
+  llm-immo-scraper "https://willhaben.at/..." "https://immoscout24.at/..." -o results.json
+
+  # Legacy file mode (reads input.txt)
+  llm-immo-scraper
+
+Environment:
+  GEMINI_API_KEY          Required. Get a free key at https://aistudio.google.com/app/apikey
+`.trimStart();
+    process.stderr.write(help);
+}
+
+// ── Configuration ────────────────────────────────────────────────────
+const INPUT_FILE = path.join(process.cwd(), 'input.txt');
+const OUTPUT_FILE = path.join(process.cwd(), 'output.txt');
+const LOG_FILE = path.join(process.cwd(), 'log.txt');
 
 // ── Main ─────────────────────────────────────────────────────────────
 async function main() {
-    const logger = new Logger(LOG_FILE);
+    const opts = parseArgs(process.argv);
+
+    if (opts.help) {
+        printHelp();
+        process.exit(0);
+    }
+
+    // Determine mode
+    const cliMode = opts.urls.length > 0;
+
+    // Resolve API key
+    const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+    if (!GEMINI_API_KEY) {
+        process.stderr.write('ERROR: GEMINI_API_KEY environment variable is required.\n');
+        process.stderr.write('Get a free key at: https://aistudio.google.com/app/apikey\n');
+        process.exit(1);
+    }
+
+    // Configure logger
+    let logFile;
+    if (opts.logFile) {
+        logFile = opts.logFile;
+    } else if (!cliMode) {
+        logFile = LOG_FILE;
+    } else {
+        logFile = null; // CLI mode: stderr only
+    }
+    const logger = new Logger({ logFile, quiet: opts.quiet });
 
     // Initialize LLM
     initLLM(GEMINI_API_KEY);
 
-    // Read and parse input URLs
-    const inputContent = fs.readFileSync(INPUT_FILE, 'utf-8');
-    const urls = inputContent
-        .split('\n')
-        .map(line => line.trim())
-        .filter(line => line.length > 0 && line.startsWith('http'));
+    // Resolve input URLs
+    let urls;
+    if (cliMode) {
+        urls = opts.urls;
+        logger.info(null, `CLI mode: ${urls.length} URL(s) provided as arguments`);
+    } else {
+        if (!fs.existsSync(INPUT_FILE)) {
+            process.stderr.write('ERROR: No URLs provided and input.txt not found.\n');
+            process.stderr.write('Usage: llm-immo-scraper [urls...] or create input.txt\n');
+            process.exit(1);
+        }
+        const inputContent = fs.readFileSync(INPUT_FILE, 'utf-8');
+        urls = inputContent
+            .split('\n')
+            .map(line => line.trim())
+            .filter(line => line.length > 0 && line.startsWith('http'));
+        logger.info(null, `File mode: ${urls.length} URL(s) read from input.txt`);
+    }
 
     if (urls.length === 0) {
-        logger.error(null, 'No valid URLs found in input.txt');
+        logger.error(null, 'No valid URLs to scrape');
         process.exit(1);
     }
 
@@ -57,19 +159,32 @@ async function main() {
     // Shared results array (all crawlers push to this)
     const allResults = [];
 
-
-
-
-    // Launch one crawler per domain (in parallel, matching original behavior)
+    // Launch one crawler per domain (in parallel)
     const crawlerPromises = Object.entries(domainGroups).map(([domain, domainUrls]) => {
         return runDomainCrawler(domain, domainUrls, logger, allResults);
     });
 
     await Promise.all(crawlerPromises);
 
-    // Write output
-    fs.writeFileSync(OUTPUT_FILE, JSON.stringify(allResults, null, 2), 'utf-8');
-    logger.info(null, `Scraping complete. ${allResults.length} listings written to output.txt`);
+    // Output results
+    const jsonOutput = JSON.stringify(allResults, null, 2);
+
+    const outputFile = opts.outputFile || (!cliMode ? OUTPUT_FILE : null);
+    if (outputFile) {
+        fs.writeFileSync(outputFile, jsonOutput, 'utf-8');
+        logger.info(null, `${allResults.length} listings written to ${outputFile}`);
+    }
+
+    if (cliMode && !opts.outputFile) {
+        // CLI mode without explicit output file: write JSON to stdout
+        process.stdout.write(jsonOutput + '\n');
+    }
+
+    logger.info(null, `Scraping complete. ${allResults.length} listings extracted.`);
+
+    if (allResults.length === 0) {
+        process.exit(2);
+    }
 }
 
 /**
@@ -87,7 +202,7 @@ async function runDomainCrawler(domain, urls, logger, results) {
     const config = new Configuration({
         persistStorage: false,
         storageClientOptions: {
-            localDataDirectory: path.join(__dirname, '..', '.storage', domain),
+            localDataDirectory: path.join(process.cwd(), '.storage', domain),
         },
     });
 
@@ -162,6 +277,6 @@ async function runDomainCrawler(domain, urls, logger, results) {
 
 // ── Run ──────────────────────────────────────────────────────────────
 main().catch(err => {
-    console.error('Fatal error:', err);
+    process.stderr.write(`Fatal error: ${err.message}\n`);
     process.exit(1);
 });

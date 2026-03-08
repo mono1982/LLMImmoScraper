@@ -1,11 +1,19 @@
 const fs = require('fs');
-const path = require('path');
 
 class Logger {
-    constructor(logFilePath) {
-        this.logFilePath = logFilePath;
-        // Clear log file on start
-        fs.writeFileSync(this.logFilePath, '', 'utf-8');
+    /**
+     * @param {object} options
+     * @param {string} [options.logFile]  - Path to log file (omit for stderr-only)
+     * @param {boolean} [options.quiet]   - Suppress all log output
+     */
+    constructor({ logFile = null, quiet = false } = {}) {
+        this.logFile = logFile;
+        this.quiet = quiet;
+
+        // Clear log file on start if using file mode
+        if (this.logFile) {
+            fs.writeFileSync(this.logFile, '', 'utf-8');
+        }
     }
 
     _timestamp() {
@@ -13,10 +21,18 @@ class Logger {
     }
 
     _write(level, domain, message, extra = '') {
+        if (this.quiet) return;
+
         const prefix = domain ? `[${domain}]` : '';
         const line = `${this._timestamp()} ${level.padEnd(5)} ${prefix}${prefix ? ': ' : ''}${message}${extra ? ' ' + JSON.stringify(extra) : ''}\n`;
-        fs.appendFileSync(this.logFilePath, line, 'utf-8');
-        process.stdout.write(line);
+
+        // Always write to stderr (never pollutes stdout)
+        process.stderr.write(line);
+
+        // Optionally also write to log file
+        if (this.logFile) {
+            fs.appendFileSync(this.logFile, line, 'utf-8');
+        }
     }
 
     info(domain, message, extra) {

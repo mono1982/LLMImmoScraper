@@ -8,6 +8,7 @@ Point it at search result pages from supported Austrian real estate portals, and
 
 ## ✨ Features
 
+- **Agent-Friendly CLI** — Pass URLs as args, get JSON on stdout. Pipe-friendly, zero config
 - **LLM-Powered Extraction** — Uses Gemini 2.0 Flash to intelligently parse listing pages instead of brittle CSS selectors
 - **Multi-Site Support** — Crawls multiple real estate portals in parallel (willhaben.at, immobilienscout24.at, etc.)
 - **Smart URL Discovery** — LLM filters search result links to find actual property detail pages
@@ -39,24 +40,62 @@ cp .env.example .env
 # Edit .env and add your Gemini API key
 ```
 
-### Add Search URLs
-
-Create an `input.txt` file in the project root with one search URL per line:
-
-```
-https://www.willhaben.at/iad/immobilien/haus-kaufen/haus-angebote?areaId=900&rows=30&PRICE_TO=500000
-https://www.immobilienscout24.at/regional/1220/haus-kaufen?primaryPriceTo=500000
-```
-
-See [`examples/input.example.txt`](examples/input.example.txt) for a full example.
-
 ### Run
 
 ```bash
+# Pass URLs directly — JSON output on stdout
+node src/main.js "https://www.willhaben.at/iad/immobilien/haus-kaufen/..." "https://www.immoscout24.at/..."
+
+# Or use the legacy file mode (reads input.txt, writes output.txt)
 npm start
 ```
 
-Results are written to `output.txt` as a JSON array. Logs go to `log.txt` and stdout.
+---
+
+## 🤖 CLI Usage
+
+Designed to be called by other tools, scripts, and AI agents.
+
+```
+Usage: llm-immo-scraper [options] [urls...]
+
+Arguments:
+  urls                    Search result URLs to scrape
+
+Options:
+  -o, --output <file>     Write JSON to file instead of stdout
+  -l, --log <file>        Write logs to file (in addition to stderr)
+  -q, --quiet             Suppress log output
+  -h, --help              Show help
+```
+
+### Examples
+
+```bash
+# Scrape and pipe to jq
+node src/main.js "https://willhaben.at/..." 2>/dev/null | jq '.[].title'
+
+# Save results to a file
+node src/main.js "https://willhaben.at/..." -o results.json
+
+# Multiple sites in one call
+node src/main.js "https://willhaben.at/..." "https://immoscout24.at/..." | jq length
+
+# Quiet mode (no logs at all)
+node src/main.js -q "https://willhaben.at/..." > results.json
+
+# Install globally, then call as a command
+npm link
+llm-immo-scraper "https://willhaben.at/..."
+```
+
+### Exit Codes
+
+| Code | Meaning |
+|------|---------|
+| `0`  | Success |
+| `1`  | Configuration error (missing API key, no URLs) |
+| `2`  | Scraping completed but no results extracted |
 
 ### Validate Output
 
@@ -69,7 +108,7 @@ npm run validate
 ## 🔍 How It Works
 
 ```
-input.txt (search URLs)
+  CLI args / input.txt
         │
         ▼
 ┌───────────────────┐
@@ -96,7 +135,7 @@ input.txt (search URLs)
 └────────┬──────────┘
          │
          ▼
-    output.txt (JSON)
+  stdout / output.txt
 ```
 
 ---
@@ -157,9 +196,9 @@ LLMImmoScraper/
 │   └── output.example.json # Sample output data
 ├── package.json
 └── src/
-    ├── main.js           # Entry point — orchestrates crawlers
+    ├── main.js           # CLI entry point — arg parsing, dual-mode orchestration
     ├── llm.js            # Gemini API integration (URL filtering + data extraction)
-    ├── logger.js         # File + stdout logger
+    ├── logger.js         # Dual-output logger (stderr + optional file)
     ├── schema.js         # LLM prompts and JSON schema definitions
     ├── validate.js       # Output schema validator
     └── handlers/
