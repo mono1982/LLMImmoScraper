@@ -16,6 +16,7 @@ function parseArgs(argv) {
         urls: [],
         outputFile: null,
         logFile: null,
+        provider: null,
         quiet: false,
         help: false,
     };
@@ -31,6 +32,8 @@ function parseArgs(argv) {
             opts.outputFile = args[++i];
         } else if ((arg === '-l' || arg === '--log') && i + 1 < args.length) {
             opts.logFile = args[++i];
+        } else if ((arg === '-p' || arg === '--provider') && i + 1 < args.length) {
+            opts.provider = args[++i];
         } else if (arg.startsWith('http')) {
             opts.urls.push(arg);
         } else if (!arg.startsWith('-')) {
@@ -47,33 +50,39 @@ function printHelp() {
     const help = `
 Usage: llm-immo-scraper [options] [urls...]
 
-  AI-powered real estate scraper using Gemini LLM.
+  AI-powered real estate scraper. Supports Gemini, OpenAI, and Anthropic.
 
 Arguments:
-  urls                    Search result URLs to scrape (space-separated)
+  urls                      Search result URLs to scrape (space-separated)
 
 Options:
-  -o, --output <file>     Write JSON output to file instead of stdout
-  -l, --log <file>        Write logs to file in addition to stderr
-  -q, --quiet             Suppress log output
-  -h, --help              Show this help message
+  -p, --provider <name>     LLM provider: gemini, openai, anthropic (auto-detected from env)
+  -o, --output <file>       Write JSON output to file instead of stdout
+  -l, --log <file>          Write logs to file in addition to stderr
+  -q, --quiet               Suppress log output
+  -h, --help                Show this help message
 
 Modes:
-  CLI mode (urls given):  Logs → stderr, JSON → stdout (pipe-friendly)
-  File mode (no urls):    Reads input.txt, writes output.txt, logs to log.txt
+  CLI mode (urls given):    Logs -> stderr, JSON -> stdout (pipe-friendly)
+  File mode (no urls):      Reads input.txt, writes output.txt, logs to log.txt
 
 Examples:
-  # Scrape and pipe JSON output
-  llm-immo-scraper "https://willhaben.at/..." | jq '.[].title'
+  # Scrape with auto-detected provider
+  llm-immo-scraper "https://willhaben.at/..."
 
-  # Scrape multiple sites, save to file
-  llm-immo-scraper "https://willhaben.at/..." "https://immoscout24.at/..." -o results.json
+  # Force a specific provider
+  llm-immo-scraper --provider openai "https://willhaben.at/..."
+
+  # Pipe JSON output
+  llm-immo-scraper "https://willhaben.at/..." 2>/dev/null | jq '.[].title'
 
   # Legacy file mode (reads input.txt)
   llm-immo-scraper
 
-Environment:
-  GEMINI_API_KEY          Required. Get a free key at https://aistudio.google.com/app/apikey
+Environment (first key found is used):
+  GEMINI_API_KEY            Google Gemini  — https://aistudio.google.com/app/apikey
+  OPENAI_API_KEY            OpenAI         — https://platform.openai.com/api-keys
+  ANTHROPIC_API_KEY         Anthropic      — https://console.anthropic.com/settings/keys
 `.trimStart();
     process.stderr.write(help);
 }
@@ -82,6 +91,48 @@ Environment:
 const INPUT_FILE = path.join(process.cwd(), 'input.txt');
 const OUTPUT_FILE = path.join(process.cwd(), 'output.txt');
 const LOG_FILE = path.join(process.cwd(), 'log.txt');
+
+// ── Provider Resolution ──────────────────────────────────────────────
+const GeminiProvider = require('./providers/gemini');
+const OpenAIProvider = require('./providers/openai');
+const AnthropicProvider = require('./providers/anthropic');
+
+const PROVIDERS = {
+    gemini: { envKey: 'GEMINI_API_KEY', Provider: GeminiProvider },
+    openai: { envKey: 'OPENAI_API_KEY', Provider: OpenAIProvider },
+    anthropic: { envKey: 'ANTHROPIC_API_KEY', Provider: AnthropicProvider },
+};
+
+function resolveProvider(requested) {
+    // If explicitly requested, use that provider
+    if (requested) {
+        const entry = PROVIDERS[requested];
+        if (!entry) {
+            process.stderr.write(`ERROR: Unknown provider "${requested}". Choose: ${Object.keys(PROVIDERS).join(', ')}\n`);
+            process.exit(1);
+        }
+        const apiKey = process.env[entry.envKey];
+        if (!apiKey) {
+            process.stderr.write(`ERROR: ${entry.envKey} environment variable is required for --provider ${requested}\n`);
+            process.exit(1);
+        }
+        return new entry.Provider(apiKey);
+    }
+
+    // Auto-detect: first key found wins
+    for (const [name, { envKey, Provider }] of Object.entries(PROVIDERS)) {
+        const apiKey = process.env[envKey];
+        if (apiKey) {
+            return new Provider(apiKey);
+        }
+    }
+
+    process.stderr.write('ERROR: No LLM API key found. Set one of:\n');
+    process.stderr.write('  GEMINI_API_KEY    — https://aistudio.google.com/app/apikey\n');
+    process.stderr.write('  OPENAI_API_KEY    — https://platform.openai.com/api-keys\n');
+    process.stderr.write('  ANTHROPIC_API_KEY — https://console.anthropic.com/settings/keys\n');
+    process.exit(1);
+}
 
 // ── Main ─────────────────────────────────────────────────────────────
 async function main() {
@@ -95,14 +146,6 @@ async function main() {
     // Determine mode
     const cliMode = opts.urls.length > 0;
 
-    // Resolve API key
-    const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-    if (!GEMINI_API_KEY) {
-        process.stderr.write('ERROR: GEMINI_API_KEY environment variable is required.\n');
-        process.stderr.write('Get a free key at: https://aistudio.google.com/app/apikey\n');
-        process.exit(1);
-    }
-
     // Configure logger
     let logFile;
     if (opts.logFile) {
@@ -114,8 +157,10 @@ async function main() {
     }
     const logger = new Logger({ logFile, quiet: opts.quiet });
 
-    // Initialize LLM
-    initLLM(GEMINI_API_KEY);
+    // Resolve and initialize LLM provider
+    const provider = resolveProvider(opts.provider);
+    logger.info(null, `Using LLM provider: ${provider.name}`);
+    initLLM(provider);
 
     // Resolve input URLs
     let urls;

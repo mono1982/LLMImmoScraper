@@ -1,13 +1,15 @@
-const { GoogleGenerativeAI } = require('@google/generative-ai');
 const { LISTING_SCHEMA_PROMPT, FILTER_URLS_PROMPT } = require('./schema');
 
 const MAX_RETRIES = 2;
 
-let model = null;
+let provider = null;
 
-function initLLM(apiKey) {
-    const genAI = new GoogleGenerativeAI(apiKey);
-    model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+/**
+ * Initialize the LLM with a provider instance.
+ * @param {object} llmProvider - Provider with a generateText(prompt) method
+ */
+function initLLM(llmProvider) {
+    provider = llmProvider;
 }
 
 /**
@@ -18,8 +20,7 @@ async function filterDetailUrls(pageText, urls, logger, domain) {
 
     for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
         try {
-            const result = await model.generateContent(input);
-            const response = result.response.text().trim();
+            const response = await provider.generateText(input);
 
             const jsonStr = extractJson(response);
             const parsed = JSON.parse(jsonStr);
@@ -45,14 +46,13 @@ async function filterDetailUrls(pageText, urls, logger, domain) {
  */
 async function extractListingData(pageText, logger, domain) {
     const charCount = pageText.length;
-    logger.info(domain, `Extracting real estate listing data with LLM. This may take a few seconds... (Character count: ${charCount})`);
+    logger.info(domain, `Extracting real estate listing data with LLM (${provider.name}). This may take a few seconds... (Character count: ${charCount})`);
 
     const input = `${LISTING_SCHEMA_PROMPT}\n\nPage content:\n${pageText.substring(0, 30000)}`;
 
     for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
         try {
-            const result = await model.generateContent(input);
-            const response = result.response.text().trim();
+            const response = await provider.generateText(input);
 
             const jsonStr = extractJson(response);
             const parsed = JSON.parse(jsonStr);
@@ -64,7 +64,7 @@ async function extractListingData(pageText, logger, domain) {
         } catch (err) {
             if (attempt < MAX_RETRIES) {
                 logger.warn(domain, `LLM parsing failed. Gracefully retrying...`);
-                logger.info(domain, `Extracting real estate listing data with LLM. This may take a few seconds... (Character count: ${charCount})`);
+                logger.info(domain, `Extracting real estate listing data with LLM (${provider.name}). This may take a few seconds... (Character count: ${charCount})`);
             } else {
                 logger.error(domain, `LLM extraction failed after ${MAX_RETRIES + 1} attempts: ${err.message}`);
                 return null;

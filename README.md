@@ -1,6 +1,6 @@
 # 🏠 LLM Immo Scraper
 
-**AI-powered real estate scraper** that crawls property listing sites and extracts structured data using Google's Gemini LLM.
+**AI-powered real estate scraper** that crawls property listing sites and extracts structured data using LLMs (Gemini, OpenAI, or Anthropic — auto-detected from your API key).
 
 Point it at search result pages from supported Austrian real estate portals, and it will automatically discover individual listings, extract detailed property information, and output clean, structured JSON.
 
@@ -9,7 +9,8 @@ Point it at search result pages from supported Austrian real estate portals, and
 ## ✨ Features
 
 - **Agent-Friendly CLI** — Pass URLs as args, get JSON on stdout. Pipe-friendly, zero config
-- **LLM-Powered Extraction** — Uses Gemini 2.0 Flash to intelligently parse listing pages instead of brittle CSS selectors
+- **Multi-LLM Support** — Works with Gemini, OpenAI, and Anthropic. Auto-detects from env vars, or pick with `--provider`
+- **LLM-Powered Extraction** — Intelligently parses listing pages instead of brittle CSS selectors
 - **Multi-Site Support** — Crawls multiple real estate portals in parallel (willhaben.at, immobilienscout24.at, etc.)
 - **Smart URL Discovery** — LLM filters search result links to find actual property detail pages
 - **Structured Output** — Produces consistent JSON with address, price, features, and metadata
@@ -197,22 +198,30 @@ LLMImmoScraper/
 ├── package.json
 └── src/
     ├── main.js           # CLI entry point — arg parsing, dual-mode orchestration
-    ├── llm.js            # Gemini API integration (URL filtering + data extraction)
+    ├── llm.js            # Provider-agnostic LLM interface
     ├── logger.js         # Dual-output logger (stderr + optional file)
     ├── schema.js         # LLM prompts and JSON schema definitions
     ├── validate.js       # Output schema validator
-    └── handlers/
-        ├── search.js     # Search results page handler
-        └── detail.js     # Property detail page handler
+    ├── handlers/
+    │   ├── search.js     # Search results page handler
+    │   └── detail.js     # Property detail page handler
+    └── providers/
+        ├── gemini.js     # Google Gemini (gemini-2.0-flash)
+        ├── openai.js     # OpenAI (gpt-4o-mini)
+        └── anthropic.js  # Anthropic (claude-sonnet-4-20250514)
 ```
 
 ---
 
 ## ⚙️ Configuration
 
-| Variable        | Required | Description                          |
-|-----------------|----------|--------------------------------------|
-| `GEMINI_API_KEY` | ✅       | Google Gemini API key                |
+| Variable          | Required | Description                                  |
+|-------------------|----------|----------------------------------------------|
+| `GEMINI_API_KEY`    | one of   | Google Gemini — [get key](https://aistudio.google.com/app/apikey) |
+| `OPENAI_API_KEY`    | one of   | OpenAI — [get key](https://platform.openai.com/api-keys) |
+| `ANTHROPIC_API_KEY` | one of   | Anthropic — [get key](https://console.anthropic.com/settings/keys) |
+
+Set at least one API key. The first one found is used. Override with `--provider`.
 
 Crawling parameters (concurrency, timeouts, retries) can be adjusted in [`src/main.js`](src/main.js).
 
